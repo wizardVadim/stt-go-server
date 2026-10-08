@@ -4,23 +4,19 @@ services:
   stt-server:
     build:
       context: .
-      dockerfile: ./stt-server/Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "127.0.0.1:8080:8080"
     environment:
       - STT_LISTEN=0.0.0.0:8080
-      
       - STT_DATA_DIR=/var/lib/stt
       - STT_DB_PATH=/var/lib/stt/jobs.sqlite
-      
       - STT_MIGRATIONS_DIR=/opt/stt/migrations
       - STT_WEB_DIR=/opt/stt/web/dist
-      
       - STT_FFPROBE=/usr/bin/ffprobe
       - STT_FFMPEG=/usr/bin/ffmpeg
       - STT_WHISPER=/opt/stt/whisper-cli
       - STT_MODEL=/opt/stt/models/ggml-large-v3-turbo.bin
-      
       - STT_THREADS=4
       - STT_MAX_UPLOAD_BYTES=524288000
       - STT_MIN_FREE_BYTES=1073741824
@@ -34,11 +30,13 @@ services:
 
   stt-frontend:
     build:
-      context: ./web # Путь к папке фронтенда
+      context: ./web
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:5174:5174" # Прокидываем порт для тестов Playwright
+      - "127.0.0.1:5174:5174"
+    environment:
+      - STT_API_PROXY=http://stt-server:8080
     volumes:
-      - ./web:/app # Прокидываем код для работы Hot Reload (редактируете на хосте — меняется в контейнере)
-      - /app/node_modules # Изолируем модули контейнера от локальных
+      - ./web:/app
+      - /app/node_modules
     restart: always
