@@ -4,12 +4,13 @@ RUN apt-get update && apt-get install -y gcc musl-dev && rm -rf /var/lib/apt/lis
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY stt-service/go.mod stt-service/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY stt-service/ ./stt-service/
+COPY migrations/ ./migrations/
 
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/main ./stt-server/main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/main ./stt-service/cmd/main.go
 
 FROM debian:bullseye-slim
 
@@ -23,11 +24,12 @@ RUN mkdir -p /var/lib/stt /opt/stt/migrations /opt/stt/web/dist /opt/stt/models
 WORKDIR /opt/stt
 
 COPY --from=builder /app/bin/main ./main
-
 COPY --from=builder /app/migrations ./migrations
-COPY --from=builder /app/web/dist ./web/dist
 
-COPY --from=builder /app/whisper-cli /opt/stt/whisper-cli
+# ВНИМАНИЕ: Если whisper-cli — это внешний бинарник, который вы скачиваете вручную,
+# его нужно положить в проект и раскомментировать строку ниже. 
+# Пока закомментировано, чтобы не вызывать ошибку "no such file or directory" при сборке.
+# COPY --from=builder /app/whisper-cli /opt/stt/whisper-cli
 
 EXPOSE 8080
 
