@@ -1,30 +1,38 @@
-# --- Этап сборки приложения ---
+# --- Сборка Go-приложения ---
 FROM golang:1.27-bookworm AS builder
 
 WORKDIR /app
 
-# Копируем зависимости
+# Зависимости
 COPY stt-service/go.mod stt-service/go.sum ./
 RUN go mod download
 
-# Копируем исходники и миграции
-COPY stt-service/ ./stt-service/
+# Исходники Go
+COPY stt-service/ ./
+
+# Миграции
 COPY migrations/ ./migrations/
 
-# Собираем бинарник
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/main ./stt-service/cmd/main.go
+# Компиляция
+RUN CGO_ENABLED=1 GOOS=linux go build -o /app/bin/main ./cmd
 
-# --- Финальный легкий образ ---
+# --- Финальный образ ---
 FROM debian:bookworm-slim
 
-# Ставим только самое нужное (ffmpeg ставится одной строкой и без сбоев)
-RUN apt-get update && apt-get install -y ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Создаем структуру папок
-RUN mkdir -p /var/lib/stt /opt/stt/migrations /opt/stt/web/dist /opt/stt/models
+RUN mkdir -p \
+    /var/lib/stt \
+    /opt/stt/migrations \
+    /opt/stt/web/dist \
+    /opt/stt/models
+
 WORKDIR /opt/stt
 
-# Переносим результаты сборки
 COPY --from=builder /app/bin/main ./main
 COPY --from=builder /app/migrations ./migrations
 
