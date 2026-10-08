@@ -31,7 +31,7 @@ services:
       context: ./web
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:5174:5174"
+      - "5174:5174"
     environment:
       - STT_API_PROXY=http://stt-server:8080
     volumes:
