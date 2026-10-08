@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   stt-server:
     build:
-      context: ./stt-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./stt-service/Dockerfile
     ports:
       - "127.0.0.1:8080:8080"
     environment:
