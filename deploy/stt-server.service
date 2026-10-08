@@ -1,0 +1,24 @@
+[Unit]
+Description=Local lecture transcription server
+After=network.target
+
+[Service]
+Type=simple
+User=stt
+Group=stt
+WorkingDirectory=/opt/stt
+EnvironmentFile=/etc/stt-server.env
+ExecStart=/opt/stt/stt-server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/stt
+
+[Install]
+WantedBy=multi-user.target

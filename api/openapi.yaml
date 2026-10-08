@@ -1,0 +1,246 @@
+openapi: 3.0.3
+info:
+  title: Slovo STT API
+  version: 0.1.0
+  description: >-
+    Integration contract implemented by stt-service and used by web/.
+    English transcription only, media duration at most 600 seconds inclusive.
+    All routes are same-origin; timestamps are RFC 3339 UTC, media offsets are seconds.
+servers:
+  - url: /api
+paths:
+  /jobs:
+    get:
+      operationId: listJobs
+      summary: Return jobs with removed_at unset, newest first
+      responses:
+        "200":
+          description: Jobs (empty array when no jobs exist)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs]
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Job"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createJob
+      summary: Upload one file and enqueue transcription after validation
+      description: >-
+        Stream the upload to disk. Use ffprobe to validate actual media duration and audio track
+        before accepting the job. Reject duration above 600 seconds, invalid/unknown duration,
+        empty media and missing audio. Do not truncate. Never trust browser metadata.
+        Validation may continue after upload reaches 100 percent. Return promptly after enqueueing,
+        not after transcription. The job continues independently of the browser connection.
+        Do not automatically retry POST: the response may be lost after accepting the file.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, language]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                language:
+                  type: string
+                  enum: [en]
+      responses:
+        "202":
+          description: Accepted into a persistent queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "413":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /jobs/{id}/transcript:
+    parameters:
+      - $ref: "#/components/parameters/JobID"
+    get:
+      operationId: getTranscript
+      summary: Return complete original-language text and timestamped segments
+      responses:
+        "200":
+          description: Completed result; text may be empty if no speech was detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transcript"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /jobs/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/JobID"
+    post:
+      operationId: cancelJob
+      summary: Stop a queued, preparing or transcribing job and its child processes
+      responses:
+        "200":
+          description: Updated job (cancelled)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /jobs/{id}/retry:
+    parameters:
+      - $ref: "#/components/parameters/JobID"
+    post:
+      operationId: retryJob
+      summary: Requeue a failed or cancelled job using its retained source file
+      description: Keep the same job ID. Reset progress, error and finished_at. Return 409 if retry is unavailable, including when files have been removed.
+      responses:
+        "202":
+          description: Updated job (queued)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+  /jobs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/JobID"
+    delete:
+      operationId: deleteJob
+      summary: Remove files of a completed, failed or cancelled job and hide it from the list
+      description: >-
+        Return 409 for active jobs; cancel them first. Delete source, temporary and result files,
+        then set removed_at. Retain the database row and original processing status for history.
+        Removed jobs are excluded from GET /jobs and their transcript is unavailable (404).
+      responses:
+        "204":
+          description: Deleted; empty response body
+        "409":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    JobID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    Error:
+      description: Actionable error without filesystem paths or credentials
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                    example: duration_exceeded
+                  message:
+                    type: string
+                    example: Длительность записи превышает 10 минут.
+  schemas:
+    Job:
+      type: object
+      required:
+        [
+          id,
+          filename,
+          size_bytes,
+          duration_seconds,
+          language,
+          status,
+          progress,
+          created_at,
+          updated_at,
+          error,
+        ]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        filename:
+          type: string
+          description: Original filename, not a filesystem path
+        size_bytes:
+          type: integer
+          minimum: 1
+        duration_seconds:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 600
+        language:
+          type: string
+          enum: [en]
+        status:
+          type: string
+          enum: [queued, preparing, transcribing, completed, failed, cancelled]
+        progress:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1
+          description: Real recognition progress, not upload progress. Null when unknown; 1 when completed.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+          nullable: true
+          description: User-facing explanation for failed jobs; null otherwise
+    Transcript:
+      type: object
+      required: [language, text, segments]
+      properties:
+        language:
+          type: string
+          enum: [en]
+        text:
+          type: string
+          description: Full transcript in English, never a translation or summary
+        segments:
+          type: array
+          description: Ordered non-overlapping segments inside media duration; [] if unavailable
+          items:
+            type: object
+            required: [start, end, text]
+            properties:
+              start:
+                type: number
+                minimum: 0
+                description: Absolute offset in seconds
+              end:
+                type: number
+                minimum: 0
+                description: Absolute offset in seconds, at least start
+              text:
+                type: string

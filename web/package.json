@@ -1,0 +1,31 @@
+{
+  "name": "stt-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:demo": "vite --host 127.0.0.1 --mode demo",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:e2e": "playwright test",
+    "format": "prettier --write src vite.config.ts tsconfig.json playwright.config.ts tests",
+    "format:check": "prettier --check src vite.config.ts tsconfig.json playwright.config.ts tests"
+  },
+  "dependencies": {
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.4",
+    "@vitejs/plugin-vue": "6.0.9",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "vite": "8.3.3",
+    "vue-tsc": "3.3.12"
+  }
+}

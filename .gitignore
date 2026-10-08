@@ -1,0 +1,19 @@
+.env
+.env.*
+!.env.example
+samples/
+artifacts/
+__pycache__/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+
+# Backend runtime data and SQLite files
+/stt-service/data/
+/data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-wal
+*.db-shm
